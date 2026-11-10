@@ -1,0 +1,42 @@
+name: CI
+on:
+  pull_request:
+    branches: [develop, qa, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  infra-structure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check repository baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s README.md
+          test -s .github/CODEOWNERS
+      - name: Reject committed secrets files
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=$(git ls-files | grep -E '(^|/)\.env$|(^|/)\.env\.[^/]+$|\.(pem|key|p12|pfx)$' | grep -vE '\.env\.example$' || true)
+          if [ -n "$found" ]; then
+            echo "Secret-like files must not be committed:"
+            echo "$found"
+            exit 1
+          fi
+      - name: Validate Compose files
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(git ls-files | grep -E '(^|/)(docker-)?compose[^/]*\.ya?ml$' || true)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No Compose files yet; nothing to validate."
+            exit 0
+          fi
+          for file in "${files[@]}"; do
+            echo "Validating $file"
+            docker compose -f "$file" config --quiet
+          done
