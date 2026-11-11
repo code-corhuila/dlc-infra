@@ -3,7 +3,7 @@ $infra = Split-Path $PSScriptRoot -Parent
 $id = [guid]::NewGuid().ToString('N')
 $project = "dlcfreshfinal$id"
 $temp = Join-Path ([IO.Path]::GetTempPath()) "dlc-fresh-final-$id"
-$names = @('DLC_RUNTIME_DIR','DLC_IMAGE_TAG','DLC_FRONT_PORT','DLC_MAIL_PORT','DLC_PUBLIC_ORIGIN','DLC_EDGE_SUBNET','DLC_FRONT_IP','DLC_GATEWAY_IP','DLC_ADMIN_EMAIL','COMPOSE_PARALLEL_LIMIT')
+$names = @('DLC_RUNTIME_DIR','DLC_IMAGE_TAG','DLC_FRONT_PORT','DLC_MAIL_PORT','DLC_PUBLIC_ORIGIN','DLC_EDGE_SUBNET','DLC_FRONT_IP','DLC_GATEWAY_IP','DLC_ADMIN_EMAIL','DLC_WORKER_SMTP_HOST','DLC_WORKER_SMTP_PORT','DLC_WORKER_SMTP_STARTTLS','DLC_WORKER_SMTP_USERNAME','DLC_WORKER_SMTP_FROM','COMPOSE_PARALLEL_LIMIT')
 $old = @{}
 foreach ($name in $names) { $old[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }
 $env:DLC_RUNTIME_DIR = $temp.Replace('\','/')
@@ -15,8 +15,13 @@ $env:DLC_EDGE_SUBNET = '172.31.99.0/24'
 $env:DLC_FRONT_IP = '172.31.99.240'
 $env:DLC_GATEWAY_IP = '172.31.99.241'
 $env:DLC_ADMIN_EMAIL = 'admin@dilucca.local'
+$env:DLC_WORKER_SMTP_HOST = 'mailpit'
+$env:DLC_WORKER_SMTP_PORT = '1025'
+$env:DLC_WORKER_SMTP_STARTTLS = 'false'
+$env:DLC_WORKER_SMTP_USERNAME = ''
+$env:DLC_WORKER_SMTP_FROM = 'facturacion@dilucca.test'
 $env:COMPOSE_PARALLEL_LIMIT = '1'
-$compose = @('compose','-p',$project,'-f',(Join-Path $infra 'compose.fresh.yaml'))
+$compose = @('compose','-p',$project,'-f',(Join-Path $infra 'compose.fresh.yaml'),'-f',(Join-Path $PSScriptRoot 'compose.mailpit.override.yaml'))
 New-Item -ItemType Directory -Force $temp | Out-Null
 try {
     & docker @compose up -d --build
