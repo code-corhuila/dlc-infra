@@ -4,6 +4,10 @@ param(
     [string]$AdminEmail = 'admin@dilucca.local'
 )
 $ErrorActionPreference = 'Stop'
+foreach ($path in @('/portal-registry.json','/auth-config.json')) {
+    $response = Invoke-WebRequest -UseBasicParsing ($Origin + $path) -TimeoutSec 20
+    if ($response.StatusCode -ne 200) { throw "Frontend configuration unavailable: $path" }
+}
 $registry = Get-Content -Raw -LiteralPath (Join-Path $Runtime 'registry/portal-registry.json') | ConvertFrom-Json
 foreach ($portal in $registry.portals) {
     $response = Invoke-WebRequest -UseBasicParsing ($Origin + $portal.entryUrl) -TimeoutSec 20

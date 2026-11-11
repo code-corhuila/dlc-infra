@@ -18,6 +18,11 @@ try {
     $billingVersion = (Get-Content -Raw (Join-Path $workspace 'billing/dlc-billing-portal/package.json') | ConvertFrom-Json).version
     $billingPortal = $generatedRegistry.portals | Where-Object { $_.portalId -eq 'billing' }
     if ($billingPortal.release -ne $billingVersion -or $billingPortal.entryUrl -notmatch "/$([regex]::Escape($billingVersion))/") { throw 'Billing registry version does not match its package' }
+    $registryCheck = (Join-Path $temp 'registry/portal-registry.json').Replace('\','/') + ':/check/registry.json:ro'
+    $authCheck = (Join-Path $temp 'auth-config.json').Replace('\','/') + ':/check/auth.json:ro'
+    $jwksCheck = (Join-Path $temp 'svc/jwks.json').Replace('\','/') + ':/check/jwks.json:ro'
+    & docker run --rm --user 101:101 --entrypoint sh -v $registryCheck -v $authCheck -v $jwksCheck dlc-infra-runtime-setup:local -c 'test -r /check/registry.json && test -r /check/auth.json && test -r /check/jwks.json'
+    if ($LASTEXITCODE -ne 0) { throw 'Public frontend configuration is not readable by service users' }
     $first = (Get-FileHash -Algorithm SHA256 (Join-Path $temp 'secrets/staff-password.txt')).Hash
     $billingMount = (Join-Path $workspace 'billing/dlc-billing-portal/package.json').Replace('\','/') + ':/input/billing-package.json:ro'
     & docker run --rm -v $runtimeMount -v $registryMount -v $billingMount dlc-infra-runtime-setup:local

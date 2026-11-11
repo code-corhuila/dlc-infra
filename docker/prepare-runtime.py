@@ -111,6 +111,7 @@ for source, target in (("jwt.pub", "apt/staff.pub"), ("jwt.pub", "cln/staff.pub"
 modulus = subprocess.check_output(["openssl", "rsa", "-pubin", "-in", str(root / "secrets/svc.pub"), "-modulus", "-noout"], text=True).strip().split("=", 1)[1]
 encode = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode("ascii")
 write("svc/jwks.json", json.dumps({"keys": [{"kty": "RSA", "use": "sig", "alg": "RS256", "kid": "svc-dev-1", "n": encode(bytes.fromhex(modulus)), "e": encode(bytes.fromhex("010001"))}]}))
+allow_service_read("svc/jwks.json")
 write("secrets/billing/rabbitmq-uri", "amqp://e2e:" + passwords["rabbitmq"] + "@rabbitmq:5672")
 allow_service_read("secrets/billing/rabbitmq-uri")
 for directory, values in {
@@ -142,6 +143,7 @@ write("secrets/iam.env", "".join(key + "=" + value + "\n" for key, value in iam.
 write("secrets/iam-runtime/runtime.env", "".join(key + "=" + value + "\n" for key, value in iam.items()))
 allow_service_read("secrets/iam-runtime/runtime.env")
 write("auth-config.json", json.dumps({"issuer": "https://iam.dev.dlc.test", "audience": "dlc-api"}))
+allow_service_read("auth-config.json")
 registry = Path("/input/portal-registry.json")
 if not registry.is_file():
     raise SystemExit("Missing portal registry from dlc-front; the runtime is incomplete.")
@@ -156,5 +158,6 @@ for portal in registry_data["portals"]:
         portal["release"] = billing_release
         portal["entryUrl"] = portal["entryUrl"].replace("/" + old_release + "/", "/" + billing_release + "/")
 write("registry/portal-registry.json", json.dumps(registry_data, ensure_ascii=False))
+allow_service_read("registry/portal-registry.json")
 write(".initialized", "local development runtime v1\n")
 print("Local runtime created. Test email is captured in Mailpit.")
