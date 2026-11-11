@@ -31,12 +31,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t files < <(git ls-files | grep -E '(^|/)(docker-)?compose[^/]*\.ya?ml$' || true)
-          if [ "${#files[@]}" -eq 0 ]; then
-            echo "No Compose files yet; nothing to validate."
-            exit 0
-          fi
-          for file in "${files[@]}"; do
-            echo "Validating $file"
-            docker compose -f "$file" config --quiet
-          done
+          runtime_dir=$(mktemp -d)
+          trap 'rm -rf "$runtime_dir"' EXIT
+          mkdir -p "$runtime_dir/secrets"
+          touch "$runtime_dir/secrets/iam.env"
+          export DLC_RUNTIME_DIR="$runtime_dir"
+          export RMQ_PASS= APT_DB_PASSWORD= BILLING_DB_PASSWORD= NOTIFICATIONS_DB_PASSWORD=
+          docker compose -f compose.yaml -f compose.override.yaml config --quiet
