@@ -1,0 +1,9 @@
+# Combine the runtime preparation, PostgreSQL and MongoDB pipelines. Application
+# startup is not part of this file yet.
+services:
+  dlc-postgres:
+    depends_on:
+      prepare-runtime: {condition: service_completed_successfully}
+  dlc-mongo:
+    depends_on:
+      prepare-runtime: {condition: service_completed_successfully}
