@@ -1,0 +1,60 @@
+services:
+  auth-service:
+    environment:
+      IAM_TRUSTED_GATEWAY_IP: 172.30.0.241
+  api-gateway:
+    environment:
+      GATEWAY_TRUSTED_PROXY: 172.30.0.240/32
+    networks:
+      edge:
+        ipv4_address: 172.30.0.241
+  dlc-front:
+    networks:
+      edge:
+        ipv4_address: 172.30.0.240
+  billing-db-migrate:
+    image: liquibase/liquibase:4.33.0
+    profiles: [tooling]
+    volumes:
+      - ../../billing/dlc-billing-db:/workspace:ro
+      - ${DLC_RUNTIME_DIR}/secrets/billing-migrator.txt:/run/secrets/migrator:ro
+    working_dir: /workspace
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'export LIQUIBASE_COMMAND_PASSWORD=$$(cat /run/secrets/migrator); exec liquibase --search-path=/workspace --changelog-file=changelog/changelog-master.yaml --url=jdbc:postgresql://dlc-postgres:5432/di_lucca --username=billing_migrator --default-schema-name=billing --liquibase-schema-name=billing --contexts=dev update'
+    networks: [edge]
+  notifications-db-migrate:
+    image: liquibase/liquibase:4.33.0
+    profiles: [tooling]
+    volumes:
+      - ../../worker/dlc-worker:/workspace:ro
+      - ${DLC_RUNTIME_DIR}/secrets/notifications-runtime.txt:/run/secrets/notifications_migrator_password:ro
+    working_dir: /workspace
+    environment:
+      DLC_ENVIRONMENT: dev
+      DLC_POSTGRES_HOST: dlc-postgres
+      DLC_POSTGRES_DB: di_lucca
+    entrypoint: ["/bin/sh", "/workspace/db/deploy/run-migration.sh"]
+    command: ["update"]
+    networks: [edge]
+  patients-api:
+    environment:
+      PATIENTS_SERVICE_CLIENT_SECRET_FILE: /run/secrets/iam/client-secret
+  appointments-api:
+    environment:
+      SERVICE_CLIENT_SECRET_FILE: /run/secrets/apt/client-secret
+  billing-api:
+    environment:
+      BILLING_SERVICE_CLIENT_SECRET_FILE: /run/secrets/billing/client-secret
+  clinical-api: &clinical-token
+    environment:
+      SERVICE_CLIENT_SECRET_FILE: /run/secrets/clinical/client-secret
+      AUTH_INTERNAL_URL: http://auth-service:8080
+  clinical-outbox-relay: *clinical-token
+  clinical-inbox-consumer: *clinical-token
+  clinical-intent-reconciler: *clinical-token
+  clinical-analytics-consumer: *clinical-token
+  dlc-worker:
+    environment:
+      IAM_INTERNAL_URL: http://auth-service:8080
+      SERVICE_CLIENT_SECRET_FILE: /run/secrets/worker/client-secret
