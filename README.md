@@ -8,7 +8,17 @@ separate Compose project (`dlc-fresh`) and `.local/` for generated local
 credentials. The initial administrator email defaults to
 `admin@dilucca.local`; `DLC_ADMIN_EMAIL` can override it. The generated
 password is stored in `.local/secrets/staff-password.txt`. Mail is captured
-by Mailpit at port 18025; this setup does not send real email.
+by Mailpit at port 18025 by default; this setup does not send real email.
+
+To use an authenticated SMTP relay for the worker, set the non-secret
+`DLC_WORKER_SMTP_HOST`, `DLC_WORKER_SMTP_PORT`, `DLC_WORKER_SMTP_STARTTLS`,
+`DLC_WORKER_SMTP_USERNAME`, and `DLC_WORKER_SMTP_FROM` values in the ignored
+`.env` file. Put the password in the ignored
+`.local/secrets/worker/smtp-password` file, readable by the worker container,
+then recreate the worker with
+`docker compose -f compose.fresh.yaml up -d --no-deps --force-recreate dlc-worker`.
+This configures delivery. Immediate appointment email requires the worker's
+scheduled-event consumer; reminders also require the appointment scheduler.
 
 With Docker Desktop running and the repositories checked out in the expected
 domain directories, run from this repository:
