@@ -1,0 +1,17 @@
+# Complete qa stage (code of every qa branch): databases, migrations, APIs, portals, front and
+# a local database viewer. Started by stage-db.ps1 -Mode full; each stage is its
+# own Compose project with its own ports, subnet, volumes and secrets.
+include:
+  - path:
+      - compose.yaml
+      - compose.override.yaml
+      - compose.build.yaml
+      - compose.prepare.yaml
+      - compose.database-init.yaml
+      - compose.mongo-init.yaml
+      - compose.init.yaml
+      - compose.fresh.override.yaml
+      - compose.stage-tls.yaml
+      - compose.stage-app.yaml
+      - compose.stage-viewer.yaml
+      - compose.stage-qa.yaml
