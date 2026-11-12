@@ -11,7 +11,8 @@ New-Item -ItemType Directory -Force $temp | Out-Null
 try {
     $registry = (Join-Path $workspace 'dlc-front/dlc-front/fixtures/portal-registry.json').Replace('\','/') + ':/input/portal-registry.json:ro'
     $runtime = $temp.Replace('\','/') + ':/runtime'
-    & docker run --rm -v $runtime -v $registry dlc-infra-runtime-setup:test
+    $billingMount = (Join-Path $workspace 'billing/dlc-billing-portal/package.json').Replace('\','/') + ':/input/billing-package.json:ro'
+    & docker run --rm -v $runtime -v $registry -v $billingMount dlc-infra-runtime-setup:local
     if ($LASTEXITCODE -ne 0) { throw 'Runtime generation failed' }
     & docker @compose up -d --build dlc-mongo-runtime-identity
     if ($LASTEXITCODE -ne 0) { throw 'Clinical MongoDB initialization failed to start' }
