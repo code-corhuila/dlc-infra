@@ -99,6 +99,7 @@ cat server.crt server.key > server.pem
 rm -f ca.key ca.srl server.csr server.ext server.crt server.key
 chmod 444 ca.pem server.pem
 '@
+    $script = $script -replace "`r", ''   # Git may check this file out with CRLF line endings
     $mount = "$((Resolve-Path -LiteralPath $tlsDir).Path):/tls"
     Invoke-Docker @('run', '--rm', '-e', "STAGE=$Stage", '-v', $mount, '--entrypoint', 'sh', $mongoImage, '-c', $script)
 }
