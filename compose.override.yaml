@@ -17,7 +17,7 @@ services:
     profiles: [tooling]
     volumes:
       - ../../billing/dlc-billing-db:/workspace:ro
-      - ${DLC_RUNTIME_DIR}/secrets/billing-migrator.txt:/run/secrets/migrator:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/secrets/billing-migrator.txt:/run/secrets/migrator:ro
     working_dir: /workspace
     entrypoint: ["/bin/sh", "-c"]
     command:
@@ -28,7 +28,7 @@ services:
     profiles: [tooling]
     volumes:
       - ../../worker/dlc-worker:/workspace:ro
-      - ${DLC_RUNTIME_DIR}/secrets/notifications-runtime.txt:/run/secrets/notifications_migrator_password:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/secrets/notifications-runtime.txt:/run/secrets/notifications_migrator_password:ro
     working_dir: /workspace
     environment:
       DLC_ENVIRONMENT: dev

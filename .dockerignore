@@ -1,3 +1,4 @@
 **
 !docker/
 !docker/prepare-runtime.py
+!docker/launcher.go

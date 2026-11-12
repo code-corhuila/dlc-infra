@@ -1,5 +1,34 @@
 # DI LUCCA local orchestration
 
+## Fresh local installation
+
+The new `compose.fresh.yaml` combines runtime generation, PostgreSQL and
+MongoDB migrations, IAM provisioning, and application builds. It uses a
+separate Compose project (`dlc-fresh`) and `.local/` for generated local
+credentials. The initial administrator email defaults to
+`admin@dilucca.local`; `DLC_ADMIN_EMAIL` can override it. The generated
+password is stored in `.local/secrets/staff-password.txt`. Mail is captured
+by Mailpit at port 18025; this setup does not send real email.
+
+With Docker Desktop running and the repositories checked out in the expected
+domain directories, run from this repository:
+
+```powershell
+docker compose -f compose.fresh.yaml up -d --build
+```
+
+Ports 8081 and 18025 must be available. An existing deployment on those ports
+must be stopped first; its volumes are separate and are not deleted. On first
+startup Compose generates local credentials, builds the images, initializes
+the databases, runs the migrations and starts the services. The first build
+and startup can take several minutes. Use the current `develop` versions of
+the domain repositories, including the Patients API and portal.
+
+The fresh installation was verified from empty volumes, including all service
+processes, portal entry points, administrator login and authenticated Patients,
+Appointments and Billing requests. This does not replace a complete clinical
+and payment end-to-end test. The existing restart workflow below is unchanged.
+
 This repository starts the existing local DI LUCCA installation, including MongoDB, PostgreSQL, RabbitMQ, IAM, Patients, Appointments, Clinical, Billing, the gateway, portals and worker. It preserves the existing database volumes.
 
 From this directory in PowerShell 5.1 or later, run:

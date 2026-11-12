@@ -46,7 +46,7 @@ services:
   rabbitmq:
     <<: *restart
     image: rabbitmq:3.13-alpine
-    environment: {RABBITMQ_DEFAULT_USER: e2e, RABBITMQ_DEFAULT_PASS: "${RMQ_PASS}"}
+    environment: {RABBITMQ_DEFAULT_USER: e2e, RABBITMQ_DEFAULT_PASS: "${RMQ_PASS:-}"}
     networks: [edge]
 
   mailpit:
@@ -59,13 +59,15 @@ services:
   svc-jwks:
     <<: *restart
     image: nginx:1.27-alpine
-    volumes: ["${DLC_RUNTIME_DIR}/svc:/usr/share/nginx/html:ro"]
+    volumes: ["${DLC_RUNTIME_DIR:-./.local}/svc:/usr/share/nginx/html:ro"]
     networks: [edge]
 
   auth-service:
     <<: *restart
-    image: dlc-iam-api:e2e
-    env_file: ["${DLC_RUNTIME_DIR}/secrets/iam.env"]
+    image: dlc-iam-api:${DLC_IMAGE_TAG:-e2e}
+    env_file:
+      - path: "${DLC_RUNTIME_DIR:-./.local}/secrets/iam.env"
+        required: false
     environment:
       JAVA_TOOL_OPTIONS: -Xmx256m
       IAM_AUTH_ALLOWED_ORIGIN: http://localhost:8081
@@ -74,7 +76,7 @@ services:
 
   patients-api:
     <<: *restart
-    image: dlc-patient-api:e2e
+    image: dlc-patient-api:${DLC_IMAGE_TAG:-e2e}
     environment:
       JAVA_TOOL_OPTIONS: -Xmx256m
       SERVER_PORT: "8080"
@@ -104,21 +106,21 @@ services:
       PATIENTS_INTERNAL_ISSUER: https://services.dev.dlc.test
       PATIENTS_INTERNAL_AUDIENCE: patients-api
     volumes:
-      - ${DLC_RUNTIME_DIR}/secrets/patients-iam:/run/secrets/iam:ro
-      - ${DLC_RUNTIME_DIR}/secrets/patients-apt:/run/secrets/appointments:ro
-      - ${DLC_RUNTIME_DIR}/secrets/patients-db:/run/secrets/patients:ro
-      - ${DLC_RUNTIME_DIR}/secrets/pat-int:/run/secrets/internal:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/secrets/patients-iam:/run/secrets/iam:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/secrets/patients-apt:/run/secrets/appointments:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/secrets/patients-db:/run/secrets/patients:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/secrets/pat-int:/run/secrets/internal:ro
     networks: [edge]
 
   appointments-api:
     <<: *restart
-    image: dlc-appointments-api:e2e
+    image: dlc-appointments-api:${DLC_IMAGE_TAG:-e2e}
     environment:
       JAVA_TOOL_OPTIONS: -Xmx256m
       SERVER_PORT: "8080"
       DB_URL: jdbc:postgresql://dlc-postgres:5432/di_lucca
       DB_USERNAME: appointments_runtime
-      DB_PASSWORD: "${APT_DB_PASSWORD}"
+      DB_PASSWORD: "${APT_DB_PASSWORD:-}"
       JWT_PUBLIC_KEY_FILE: /run/secrets/apt/staff.pub
       JWT_ISSUER: https://iam.dev.dlc.test
       JWT_AUDIENCE: dlc-api
@@ -129,21 +131,21 @@ services:
       AUTH_SERVICE_TOKEN_FILE: /run/secrets/apt/auth-token
       PATIENTS_INTERNAL_URL: http://patients-api:9091
       PATIENTS_SERVICE_TOKEN_FILE: /run/secrets/apt/patients-token
-      APPOINTMENTS_RABBITMQ_URI: "amqp://e2e:${RMQ_PASS}@rabbitmq:5672"
+      APPOINTMENTS_RABBITMQ_URI: "amqp://e2e:${RMQ_PASS:-}@rabbitmq:5672"
       APPOINTMENTS_RELAY_ENABLED: "true"
       APPOINTMENTS_REMINDERS_ENABLED: "false"
       APPOINTMENTS_CONSUMERS_ENABLED: "true"
-    volumes: ["${DLC_RUNTIME_DIR}/secrets/apt:/run/secrets/apt:ro"]
+    volumes: ["${DLC_RUNTIME_DIR:-./.local}/secrets/apt:/run/secrets/apt:ro"]
     networks: [edge]
 
   billing-api:
     <<: *restart
-    image: dlc-billing-api:e2e
+    image: dlc-billing-api:${DLC_IMAGE_TAG:-e2e}
     environment:
       JAVA_TOOL_OPTIONS: -Xmx256m
       SPRING_DATASOURCE_URL: jdbc:postgresql://dlc-postgres:5432/di_lucca
       SPRING_DATASOURCE_USERNAME: billing_runtime
-      SPRING_DATASOURCE_PASSWORD: "${BILLING_DB_PASSWORD}"
+      SPRING_DATASOURCE_PASSWORD: "${BILLING_DB_PASSWORD:-}"
       BILLING_IAM_JWKS_URI: http://auth-service:8080/api/v1/auth/jwks
       IAM_JWT_ISSUER: https://iam.dev.dlc.test
       IAM_JWT_AUDIENCE: dlc-api
@@ -164,26 +166,26 @@ services:
       BILLING_SERVICE_JWT_AUDIENCE: billing-api
       BILLING_WORKER_SERVICE_SUBJECT: dlc-worker
       BILLING_CLINICAL_SERVICE_SUBJECT: clinical-api
-    volumes: ["${DLC_RUNTIME_DIR}/secrets/billing:/run/secrets/billing:ro"]
+    volumes: ["${DLC_RUNTIME_DIR:-./.local}/secrets/billing:/run/secrets/billing:ro"]
     networks: [edge]
 
   clinical-outbox-relay: &clinical-worker
     <<: *restart
-    image: dlc-clinical-api:e2e
+    image: dlc-clinical-api:${DLC_IMAGE_TAG:-e2e}
     entrypoint: ["/clinical-outbox-relay"]
     environment:
       APP_ENV: dev
       MONGO_URI: mongodb://dlc-mongo:27017/?replicaSet=rs0
       MONGO_PASSWORD_FILE: /run/secrets/clinical/clinical-runtime-password
       MONGO_DATABASE: clinical
-      RABBITMQ_URL: "amqp://e2e:${RMQ_PASS}@rabbitmq:5672/"
+      RABBITMQ_URL: "amqp://e2e:${RMQ_PASS:-}@rabbitmq:5672/"
       APPOINTMENTS_INTERNAL_URL: http://appointments-api:8080
       BILLING_INTERNAL_URL: http://billing-api:8080
       APPOINTMENTS_SERVICE_TOKEN_FILE: /run/secrets/clinical/appointments-token
       BILLING_SERVICE_TOKEN_FILE: /run/secrets/clinical/billing-token
       SERVICE_TOKEN_FILE: /run/secrets/clinical/auth-token
       CLINIC_TIMEZONE: America/Bogota
-    volumes: ["${DLC_RUNTIME_DIR}/secrets/cln:/run/secrets/clinical:ro"]
+    volumes: ["${DLC_RUNTIME_DIR:-./.local}/secrets/cln:/run/secrets/clinical:ro"]
     networks: [edge, clinical-data]
   clinical-inbox-consumer:     {<<: *clinical-worker, entrypoint: ["/clinical-inbox-consumer"]}
   clinical-intent-reconciler:  {<<: *clinical-worker, entrypoint: ["/clinical-intent-reconciler"]}
@@ -191,7 +193,7 @@ services:
 
   clinical-api:
     <<: *restart
-    image: dlc-clinical-api:e2e
+    image: dlc-clinical-api:${DLC_IMAGE_TAG:-e2e}
     environment:
       HTTP_ADDR: ":8080"
       APP_ENV: dev
@@ -211,18 +213,18 @@ services:
       BILLING_SERVICE_TOKEN_FILE: /run/secrets/clinical/billing-token
       SERVICE_TOKEN_FILE: /run/secrets/clinical/auth-token
       CLINIC_TIMEZONE: America/Bogota
-    volumes: ["${DLC_RUNTIME_DIR}/secrets/cln:/run/secrets/clinical:ro"]
+    volumes: ["${DLC_RUNTIME_DIR:-./.local}/secrets/cln:/run/secrets/clinical:ro"]
     networks: [edge, clinical-data]
 
   dlc-worker:
     <<: *restart
-    image: dlc-worker:e2e
+    image: dlc-worker:${DLC_IMAGE_TAG:-e2e}
     environment:
       JAVA_TOOL_OPTIONS: -Xmx192m
       DB_URL: jdbc:postgresql://dlc-postgres:5432/di_lucca
       DB_USERNAME: notifications_runtime
-      DB_PASSWORD: "${NOTIFICATIONS_DB_PASSWORD}"
-      WORKER_RABBITMQ_URI: "amqp://e2e:${RMQ_PASS}@rabbitmq:5672"
+      DB_PASSWORD: "${NOTIFICATIONS_DB_PASSWORD:-}"
+      WORKER_RABBITMQ_URI: "amqp://e2e:${RMQ_PASS:-}@rabbitmq:5672"
       APPOINTMENTS_INTERNAL_URL: http://appointments-api:8080
       APPOINTMENTS_SERVICE_TOKEN_FILE: /run/secrets/worker/appointments-token
       PATIENTS_INTERNAL_URL: http://patients-api:9091
@@ -233,28 +235,28 @@ services:
       SMTP_PORT: "1025"
       SMTP_STARTTLS: "false"
       SMTP_FROM: facturacion@dilucca.test
-    volumes: ["${DLC_RUNTIME_DIR}/secrets/worker:/run/secrets/worker:ro"]
+    volumes: ["${DLC_RUNTIME_DIR:-./.local}/secrets/worker:/run/secrets/worker:ro"]
     networks: [edge]
 
   api-gateway:
     <<: *restart
-    image: dlc-api-gateway:e2e
+    image: dlc-api-gateway:${DLC_IMAGE_TAG:-e2e}
     environment: {GATEWAY_ALLOWED_ORIGIN: "http://localhost:8081", GATEWAY_TRUSTED_PROXY: 172.30.0.10/32}
     networks:
       edge: {ipv4_address: 172.30.0.11, aliases: [dlc-api-gateway]}
 
-  iam-portal:          {<<: *restart, image: "dlc-iam-portal:e2e", networks: [edge]}
-  patient-portal:      {<<: *restart, image: "dlc-patient-portal:e2e", networks: [edge]}
-  appointments-portal: {<<: *restart, image: "dlc-appointments-portal:e2e", networks: [edge]}
-  billing-portal:      {<<: *restart, image: "dlc-billing-portal:e2e", networks: [edge]}
+  iam-portal:          {<<: *restart, image: "dlc-iam-portal:${DLC_IMAGE_TAG:-e2e}", networks: [edge]}
+  patient-portal:      {<<: *restart, image: "dlc-patient-portal:${DLC_IMAGE_TAG:-e2e}", networks: [edge]}
+  appointments-portal: {<<: *restart, image: "dlc-appointments-portal:${DLC_IMAGE_TAG:-e2e}", networks: [edge]}
+  billing-portal:      {<<: *restart, image: "dlc-billing-portal:${DLC_IMAGE_TAG:-e2e}", networks: [edge]}
   clinical-portal:
     <<: *restart
-    image: dlc-clinical-portal:e2e
+    image: dlc-clinical-portal:${DLC_IMAGE_TAG:-e2e}
     networks: {edge: {aliases: [clinical-portal-dlc-front]}}
 
   dlc-front:
     <<: *restart
-    image: dlc-front:e2e
+    image: dlc-front:${DLC_IMAGE_TAG:-e2e}
     environment:
       IAM_UPSTREAM: http://iam-portal
       PATIENT_UPSTREAM: http://patient-portal
@@ -264,8 +266,8 @@ services:
       GATEWAY_UPSTREAM: http://dlc-api-gateway:8080/api/v1
     ports: ["8081:80"]
     volumes:
-      - ${DLC_RUNTIME_DIR}/registry:/usr/share/nginx/deployment:ro
-      - ${DLC_RUNTIME_DIR}/auth-config.json:/usr/share/nginx/auth/auth-config.json:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/registry:/usr/share/nginx/deployment:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/auth-config.json:/usr/share/nginx/auth/auth-config.json:ro
     networks: {edge: {ipv4_address: 172.30.0.10}}
 
 networks:
@@ -273,10 +275,10 @@ networks:
   clinical-data: {external: true, name: clinical-data-e2e}
 
 secrets:
-  pg: {file: "${DLC_RUNTIME_DIR}/secrets/pg.txt"}
-  iam_migrator: {file: "${DLC_RUNTIME_DIR}/secrets/iam-migrator-password.txt"}
-  patients_migrator: {file: "${DLC_RUNTIME_DIR}/secrets/patients-migrator.txt"}
-  appointments_migrator: {file: "${DLC_RUNTIME_DIR}/secrets/appointments-migrator.txt"}
+  pg: {file: "${DLC_RUNTIME_DIR:-./.local}/secrets/pg.txt"}
+  iam_migrator: {file: "${DLC_RUNTIME_DIR:-./.local}/secrets/iam-migrator-password.txt"}
+  patients_migrator: {file: "${DLC_RUNTIME_DIR:-./.local}/secrets/patients-migrator.txt"}
+  appointments_migrator: {file: "${DLC_RUNTIME_DIR:-./.local}/secrets/appointments-migrator.txt"}
 
 volumes:
   pg_data:

@@ -1,70 +1,70 @@
 services:
   auth-service:
-    image: dlc-iam-api:e2e
+    image: dlc-iam-api:${DLC_IMAGE_TAG:-e2e}
     build:
       context: ../../iam/dlc-iam-api
       dockerfile: Dockerfile
   patients-api:
-    image: dlc-patient-api:e2e
+    image: dlc-patient-api:${DLC_IMAGE_TAG:-e2e}
     build:
-      context: ../../patients/dlc-patient-api
+      context: ${DLC_PATIENT_API_CONTEXT:-../../patients/dlc-patient-api}
       dockerfile: deploy/Dockerfile
   appointments-api:
-    image: dlc-appointments-api:e2e
+    image: dlc-appointments-api:${DLC_IMAGE_TAG:-e2e}
     build:
       context: ../../appointments/dlc-appointments-api
       dockerfile: deploy/Dockerfile
   billing-api:
-    image: dlc-billing-api:e2e
+    image: dlc-billing-api:${DLC_IMAGE_TAG:-e2e}
     build:
       context: ../../billing/dlc-billing-api
       dockerfile: ../../dlc-infra/dlc-infra/docker/billing.Dockerfile
   clinical-api:
-    image: dlc-clinical-api:e2e
+    image: dlc-clinical-api:${DLC_IMAGE_TAG:-e2e}
     build:
       context: ../../clinical/dlc-clinical-api
       dockerfile: deploy/Dockerfile
   dlc-worker:
-    image: dlc-worker:e2e
+    image: dlc-worker:${DLC_IMAGE_TAG:-e2e}
     build:
       context: ../../worker/dlc-worker
       dockerfile: deploy/Dockerfile
   api-gateway:
-    image: dlc-api-gateway:e2e
+    image: dlc-api-gateway:${DLC_IMAGE_TAG:-e2e}
     build:
       context: ../../api gateway/dlc-api-gateway
       dockerfile: deploy/Dockerfile
   dlc-front:
-    image: dlc-front:e2e
+    image: dlc-front:${DLC_IMAGE_TAG:-e2e}
     build:
       context: ../../dlc-front/dlc-front
       dockerfile: deploy/Dockerfile
   iam-portal:
-    image: dlc-iam-portal:e2e
+    image: dlc-iam-portal:${DLC_IMAGE_TAG:-e2e}
     build:
       context: ../../iam/dlc-iam-portal
       dockerfile: deploy/Dockerfile
       args:
         IAM_RELEASE: 0.1.0-local
   patient-portal:
-    image: dlc-patient-portal:e2e
+    image: dlc-patient-portal:${DLC_IMAGE_TAG:-e2e}
     build:
-      context: ../../patients/dlc-patients-portal
+      context: ${DLC_PATIENT_PORTAL_CONTEXT:-../../patients/dlc-patients-portal}
       dockerfile: deploy/Dockerfile
   appointments-portal:
-    image: dlc-appointments-portal:e2e
+    image: dlc-appointments-portal:${DLC_IMAGE_TAG:-e2e}
     build:
       context: ../../appointments/dlc-appointments-portal
       dockerfile: deploy/Dockerfile
       args:
         BUILD_SCRIPT: build:entry
   clinical-portal:
-    image: dlc-clinical-portal:e2e
+    image: dlc-clinical-portal:${DLC_IMAGE_TAG:-e2e}
     build:
       context: ../../clinical/dlc-clinical-portal
       dockerfile: deploy/Dockerfile
   billing-portal:
-    image: dlc-billing-portal:e2e
+    image: dlc-billing-portal:${DLC_IMAGE_TAG:-e2e}
     build:
       context: ../../billing/dlc-billing-portal
       dockerfile: deploy/Dockerfile

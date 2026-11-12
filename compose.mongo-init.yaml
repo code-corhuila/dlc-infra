@@ -9,14 +9,14 @@ services:
     volumes:
       - mongo_data:/data/db
       - mongo_config:/data/configdb
-      - ${DLC_RUNTIME_DIR}/mongo-secrets/mongo-root-password.txt:/run/secrets/mongo_root_password:ro
-      - ${DLC_RUNTIME_DIR}/mongo-secrets/mongo-keyfile:/run/secrets/mongo_keyfile:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/mongo-root-password.txt:/run/secrets/mongo_root_password:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/mongo-keyfile:/run/secrets/mongo_keyfile:ro
     entrypoint: ["bash", "-c", "install -m 400 -o mongodb -g mongodb /run/secrets/mongo_keyfile /data/configdb/keyfile && exec docker-entrypoint.sh \"$$@\"", "--"]
     command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--keyFile", "/data/configdb/keyfile"]
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--norc", "--eval", "quit(db.hello().isWritablePrimary ? 0 : 1)"]
-      interval: 5s
-      timeout: 5s
+      interval: 10s
+      timeout: 30s
       retries: 30
     networks: [clinical-data]
 
@@ -33,9 +33,9 @@ services:
       DLC_CLINICAL_BACKUP_PASSWORD_FILE: /run/secrets/clinical_backup_password
     volumes:
       - ../../dlc-infra-mongo/dlc-infra-mongo/scripts:/scripts:ro
-      - ${DLC_RUNTIME_DIR}/mongo-secrets/mongo-root-password.txt:/run/secrets/mongo_root_password:ro
-      - ${DLC_RUNTIME_DIR}/mongo-secrets/clinical-migrator-password.txt:/run/secrets/clinical_migrator_password:ro
-      - ${DLC_RUNTIME_DIR}/mongo-secrets/clinical-backup-password.txt:/run/secrets/clinical_backup_password:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/mongo-root-password.txt:/run/secrets/mongo_root_password:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/clinical-migrator-password.txt:/run/secrets/clinical_migrator_password:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/clinical-backup-password.txt:/run/secrets/clinical_backup_password:ro
     entrypoint: ["mongosh", "--quiet", "--norc", "mongodb://dlc-mongo:27017/?directConnection=true", "/scripts/init.js"]
     restart: on-failure:10
     networks: [clinical-data]
@@ -50,7 +50,7 @@ services:
       dlc-mongo: {condition: service_healthy}
     environment: {DLC_ENVIRONMENT: dev, MONGO_HOST: dlc-mongo, MONGO_PORT: "27017", MONGO_REPLICA_SET: rs0}
     volumes:
-      - ${DLC_RUNTIME_DIR}/mongo-secrets/clinical-migrator-password.txt:/run/secrets/clinical_migrator_password:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/clinical-migrator-password.txt:/run/secrets/clinical_migrator_password:ro
     working_dir: /workspace
     entrypoint: ["/workspace/deploy/run-migration.sh"]
     command: ["update"]
@@ -66,8 +66,8 @@ services:
       DLC_CLINICAL_RUNTIME_PASSWORD_FILE: /run/secrets/clinical_runtime_password
     volumes:
       - ../../dlc-infra-mongo/dlc-infra-mongo/scripts:/scripts:ro
-      - ${DLC_RUNTIME_DIR}/mongo-secrets/mongo-root-password.txt:/run/secrets/mongo_root_password:ro
-      - ${DLC_RUNTIME_DIR}/mongo-secrets/clinical-runtime-password.txt:/run/secrets/clinical_runtime_password:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/mongo-root-password.txt:/run/secrets/mongo_root_password:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/clinical-runtime-password.txt:/run/secrets/clinical_runtime_password:ro
     entrypoint: ["mongosh", "--quiet", "--norc", "mongodb://dlc-mongo:27017/?replicaSet=rs0", "/scripts/runtime-identity.js"]
     networks: [clinical-data]
 

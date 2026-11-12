@@ -4,6 +4,7 @@ import json
 import os
 from pathlib import Path
 import secrets
+import shutil
 import subprocess
 
 root = Path(os.environ.get("DLC_RUNTIME_DIR", "/runtime"))
@@ -19,7 +20,9 @@ if marker.is_file():
         "secrets/staff-password.txt", "secrets/cln/clinical-runtime-password",
         "mongo-secrets/mongo-root-password.txt", "mongo-secrets/mongo-keyfile",
         "mongo-secrets/clinical-migrator-password.txt", "mongo-secrets/clinical-runtime-password.txt",
-        "mongo-secrets/clinical-backup-password.txt",
+        "mongo-secrets/clinical-backup-password.txt", "launcher", "secrets/iam-runtime/runtime.env",
+        "secrets/rabbitmq/runtime.env", "secrets/apt/runtime.env", "secrets/billing/runtime.env",
+        "secrets/cln/runtime.env", "secrets/worker/runtime.env",
     )
     if any(not (root / name).is_file() for name in required):
         raise SystemExit("The existing runtime is incomplete; credentials were not changed.")
@@ -35,7 +38,9 @@ if any(root.iterdir()):
         "secrets/notifications-migrator.txt", "mongo-secrets",
         "mongo-secrets/mongo-root-password.txt", "mongo-secrets/mongo-keyfile",
         "mongo-secrets/clinical-migrator-password.txt", "mongo-secrets/clinical-runtime-password.txt",
-        "mongo-secrets/clinical-backup-password.txt",
+        "mongo-secrets/clinical-backup-password.txt", "launcher", "auth-config.json", "registry", "svc",
+        "secrets/iam-runtime", "secrets/rabbitmq", "secrets/patients-apt", "secrets/apt", "secrets/billing",
+        "secrets/cln", "secrets/patients-iam", "secrets/patients-db", "secrets/pat-int", "secrets/worker",
     }
     entries = list(root.rglob("*"))
     if any(p.is_symlink() or not p.is_dir() or p.relative_to(root).as_posix() not in allowed for p in entries):
@@ -43,6 +48,8 @@ if any(root.iterdir()):
     for path in sorted(entries, key=lambda p: len(p.parts), reverse=True):
         path.rmdir()
 root.chmod(0o700)
+shutil.copyfile("/usr/local/bin/dlc-launcher", root / "launcher")
+(root / "launcher").chmod(0o755)
 
 def write(path, value):
     target = root / path
@@ -106,6 +113,17 @@ encode = lambda b: base64.urlsafe_b64encode(b).rstrip(b"=").decode("ascii")
 write("svc/jwks.json", json.dumps({"keys": [{"kty": "RSA", "use": "sig", "alg": "RS256", "kid": "svc-dev-1", "n": encode(bytes.fromhex(modulus)), "e": encode(bytes.fromhex("010001"))}]}))
 write("secrets/billing/rabbitmq-uri", "amqp://e2e:" + passwords["rabbitmq"] + "@rabbitmq:5672")
 allow_service_read("secrets/billing/rabbitmq-uri")
+for directory, values in {
+    "rabbitmq": {"RABBITMQ_DEFAULT_PASS": passwords["rabbitmq"]},
+    "apt": {"DB_PASSWORD": passwords["appointments-runtime"], "APPOINTMENTS_RABBITMQ_URI": "amqp://e2e:" + passwords["rabbitmq"] + "@rabbitmq:5672"},
+    "billing": {"SPRING_DATASOURCE_PASSWORD": passwords["billing-runtime"]},
+    "worker": {"DB_PASSWORD": passwords["notifications-runtime"], "WORKER_RABBITMQ_URI": "amqp://e2e:" + passwords["rabbitmq"] + "@rabbitmq:5672"},
+    "cln": {"RABBITMQ_URL": "amqp://e2e:" + passwords["rabbitmq"] + "@rabbitmq:5672/"},
+}.items():
+    path = "secrets/" + directory + "/runtime.env"
+    write(path, "".join(k + "=" + v + "\n" for k, v in values.items()))
+    allow_service_read(path)
+(root / "secrets/patients-apt").mkdir(parents=True, exist_ok=True)
 write("stack.env", "\n".join(("RMQ_PASS=" + passwords["rabbitmq"], "APT_DB_PASSWORD=" + passwords["appointments-runtime"], "BILLING_DB_PASSWORD=" + passwords["billing-runtime"], "NOTIFICATIONS_DB_PASSWORD=" + passwords["notifications-runtime"])) + "\n")
 pem = lambda name: (root / "secrets" / name).read_text().strip().replace("\n", "\\n")
 iam = {
@@ -121,10 +139,22 @@ iam = {
 for name in ("IAM_CSRF_KEY_BASE64", "IAM_LOGIN_IP_DIGEST_KEY_BASE64", "IAM_REGISTRATION_PROOF_KEY_BASE64", "IAM_IDENTITY_EMAIL_LIMIT_KEY_BASE64"):
     iam[name] = base64_key()
 write("secrets/iam.env", "".join(key + "=" + value + "\n" for key, value in iam.items()))
+write("secrets/iam-runtime/runtime.env", "".join(key + "=" + value + "\n" for key, value in iam.items()))
+allow_service_read("secrets/iam-runtime/runtime.env")
 write("auth-config.json", json.dumps({"issuer": "https://iam.dev.dlc.test", "audience": "dlc-api"}))
 registry = Path("/input/portal-registry.json")
 if not registry.is_file():
     raise SystemExit("Missing portal registry from dlc-front; the runtime is incomplete.")
-write("registry/portal-registry.json", registry.read_text(encoding="utf-8"))
+registry_data = json.loads(registry.read_text(encoding="utf-8"))
+billing_package = Path("/input/billing-package.json")
+if not billing_package.is_file():
+    raise SystemExit("Missing billing portal package metadata; the runtime is incomplete.")
+billing_release = json.loads(billing_package.read_text(encoding="utf-8"))["version"]
+for portal in registry_data["portals"]:
+    if portal["portalId"] == "billing":
+        old_release = portal["release"]
+        portal["release"] = billing_release
+        portal["entryUrl"] = portal["entryUrl"].replace("/" + old_release + "/", "/" + billing_release + "/")
+write("registry/portal-registry.json", json.dumps(registry_data, ensure_ascii=False))
 write(".initialized", "local development runtime v1\n")
 print("Local runtime created. Test email is captured in Mailpit.")
