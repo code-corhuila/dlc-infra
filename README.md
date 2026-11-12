@@ -39,31 +39,36 @@ processes, portal entry points, administrator login and authenticated Patients,
 Appointments and Billing requests. This does not replace a complete clinical
 and payment end-to-end test. The existing restart workflow below is unchanged.
 
-## Stage databases: develop, qa and main
+## Stages: develop, qa and main
 
-Each stage has its own PostgreSQL and MongoDB, started as a separate Compose project
-(`dlc-db-develop`, `dlc-db-qa`, `dlc-db-main`) with its own volumes, networks and generated
-secrets under `.local/stages/<stage>` (ignored by Git). No database port is published.
+Each stage is a separate Compose project (`dlc-develop`, `dlc-qa`, `dlc-main`) with its own
+PostgreSQL, MongoDB, ports, subnet, image tag and generated secrets under
+`.local/stages/<stage>` (ignored by Git). No database port is published.
 
-| Stage | Branch | `DLC_ENVIRONMENT` / Liquibase context | Synthetic seed |
-|---|---|---|---|
-| develop | `develop` | `dev` | yes |
-| qa | `qa` | `qa` | yes |
-| main | `main` | `prod` | never |
+| Stage | Code | Liquibase context | Seed | Front | Mailpit | DB viewer |
+|---|---|---|---|---|---|---|
+| develop | repositories next to this one (`develop`) | `dev` | yes | 8081 | 18025 | 127.0.0.1:18091 |
+| qa | worktrees of each `qa` branch in `<root>/.stages/qa` | `qa` | yes | 8082 | 18026 | 127.0.0.1:18092 |
+| main | none until the first release (databases only) | `prod` | never | - | - | 127.0.0.1:18093 |
+
+`-Mode full` starts databases, APIs, portals and front; `-Mode db` (default) only the
+databases and the viewer. Billing is not started in qa because its qa branch holds no code yet.
 
 Every domain repository runs its own migrations with that context, so changesets marked
 `dev or qa` are skipped in `main`. MongoDB requires TLS 1.2+ in the three stages
 (`compose.stage-tls.yaml`); `stage-db.ps1` creates a per-stage CA and server certificate.
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\stage-db.ps1 -Stage develop
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\stage-db.ps1 -Stage qa -Action status
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\stage-db.ps1 -Stage main -Action down
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\stage-db.ps1 -Stage develop -Mode full
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\stage-db.ps1 -Stage qa -Mode full
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\stage-db.ps1 -Stage main
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\stage-db.ps1 -Stage qa -Mode full -Action status
 ```
 
-`down` removes only that stage's containers and volumes. The stage files are `env/<stage>.env`
-(no secrets) and `compose.stage-db.yaml`. These are local stage databases for validating
-migrations per branch; hosting of shared stages remains pending.
+`down` removes only that stage's containers and volumes. The administrator of each stage is
+`admin@dilucca.local` with the password in `.local/stages/<stage>/secrets/staff-password.txt`.
+In the viewer, use server `dlc-postgres`, database `di_lucca`, user `postgres` and the password
+in `secrets/pg.txt` of the stage. These stages run locally; hosting of shared stages remains pending.
 
 ## Existing local installation
 
