@@ -1,0 +1,26 @@
+# Additional tooling for a new local database. This is only one stage of setup;
+# migrations, MongoDB and IAM provisioning must also be completed before use.
+services:
+  postgres-bootstrap:
+    image: postgres:17.11-alpine3.24
+    profiles: [tooling]
+    depends_on:
+      dlc-postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: dlc-postgres
+      PGDATABASE: di_lucca
+      PGUSER: postgres
+      PGPASSWORD_FILE: /run/bootstrap-secrets/pg.txt
+      DLC_SECRETS_DIR: /run/bootstrap-secrets
+      DLC_BOOTSTRAP_DIR: /bootstrap-sql
+    volumes:
+      - ./docker/bootstrap-postgres.sh:/bootstrap.sh:ro
+      - ${DLC_RUNTIME_DIR}/secrets:/run/bootstrap-secrets:ro
+      - ../../iam/dlc-iam-db/deploy/bootstrap.sql:/bootstrap-sql/iam.sql:ro
+      - ../../patients/dlc-patient-db/deploy/bootstrap.sql:/bootstrap-sql/patients.sql:ro
+      - ../../appointments/dlc-appointments-db/deploy/bootstrap.sql:/bootstrap-sql/appointments.sql:ro
+      - ../../billing/dlc-billing-db/deploy/bootstrap.sql:/bootstrap-sql/billing.sql:ro
+      - ../../worker/dlc-worker/db/deploy/bootstrap.sql:/bootstrap-sql/notifications.sql:ro
+    entrypoint: ["sh", "/bootstrap.sh"]
+    networks: [edge]

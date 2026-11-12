@@ -1,0 +1,122 @@
+# Database initialization pipeline. Supply a private DLC_RUNTIME_DIR containing
+# the generated secrets; this file does not publish a database port.
+services:
+  dlc-postgres:
+    image: postgres:17.11-alpine3.24
+    environment:
+      POSTGRES_DB: di_lucca
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/bootstrap-secrets/pg.txt
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ${DLC_RUNTIME_DIR}/secrets:/run/bootstrap-secrets:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d di_lucca"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [edge]
+
+  postgres-bootstrap:
+    image: postgres:17.11-alpine3.24
+    depends_on:
+      dlc-postgres: {condition: service_healthy}
+    environment:
+      PGHOST: dlc-postgres
+      PGDATABASE: di_lucca
+      PGUSER: postgres
+      PGPASSWORD_FILE: /run/bootstrap-secrets/pg.txt
+      DLC_SECRETS_DIR: /run/bootstrap-secrets
+      DLC_BOOTSTRAP_DIR: /bootstrap-sql
+    volumes:
+      - ./docker/bootstrap-postgres.sh:/bootstrap.sh:ro
+      - ${DLC_RUNTIME_DIR}/secrets:/run/bootstrap-secrets:ro
+      - ../../iam/dlc-iam-db/deploy/bootstrap.sql:/bootstrap-sql/iam.sql:ro
+      - ../../patients/dlc-patient-db/deploy/bootstrap.sql:/bootstrap-sql/patients.sql:ro
+      - ../../appointments/dlc-appointments-db/deploy/bootstrap.sql:/bootstrap-sql/appointments.sql:ro
+      - ../../billing/dlc-billing-db/deploy/bootstrap.sql:/bootstrap-sql/billing.sql:ro
+      - ../../worker/dlc-worker/db/deploy/bootstrap.sql:/bootstrap-sql/notifications.sql:ro
+    entrypoint: ["sh", "/bootstrap.sh"]
+    networks: [edge]
+
+  iam-db-migrate:
+    image: liquibase/liquibase:4.33.0
+    depends_on:
+      postgres-bootstrap: {condition: service_completed_successfully}
+    volumes:
+      - ../../iam/dlc-iam-db:/workspace:ro
+      - ${DLC_RUNTIME_DIR}/secrets/iam-migrator-password.txt:/run/secrets/iam_migrator_password:ro
+    environment: {DLC_POSTGRES_HOST: dlc-postgres, DLC_POSTGRES_DB: di_lucca}
+    entrypoint: ["/bin/sh", "/workspace/deploy/run-migration.sh"]
+    command: ["update"]
+    networks: [edge]
+
+  patients-db-migrate:
+    image: liquibase/liquibase:4.29.2
+    depends_on:
+      iam-db-migrate: {condition: service_completed_successfully}
+    volumes:
+      - ../../patients/dlc-patient-db:/workspace:ro
+      - ${DLC_RUNTIME_DIR}/secrets/patients-migrator.txt:/run/secrets/patients_migrator_password:ro
+    environment: {PG_HOST: dlc-postgres, PG_DATABASE: di_lucca, PG_ENVIRONMENT: dev}
+    entrypoint: ["/bin/sh", "/workspace/deploy/run-migration.sh"]
+    command: ["update"]
+    networks: [edge]
+
+  appointments-db-migrate:
+    image: liquibase/liquibase:4.33.0
+    depends_on:
+      patients-db-migrate: {condition: service_completed_successfully}
+    volumes:
+      - ../../appointments/dlc-appointments-db:/workspace:ro
+      - ${DLC_RUNTIME_DIR}/secrets/appointments-migrator.txt:/run/secrets/appointments_migrator_password:ro
+    environment: {DLC_ENVIRONMENT: dev, DLC_POSTGRES_HOST: dlc-postgres, DLC_POSTGRES_DB: di_lucca}
+    entrypoint: ["/bin/sh", "/workspace/deploy/run-migration.sh"]
+    command: ["update"]
+    networks: [edge]
+
+  billing-db-migrate:
+    image: liquibase/liquibase:4.33.0
+    depends_on:
+      appointments-db-migrate: {condition: service_completed_successfully}
+    volumes:
+      - ../../billing/dlc-billing-db:/workspace:ro
+      - ${DLC_RUNTIME_DIR}/secrets/billing-migrator.txt:/run/secrets/migrator:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - 'export LIQUIBASE_COMMAND_PASSWORD=$$(cat /run/secrets/migrator); exec liquibase --search-path=/workspace --changelog-file=changelog/changelog-master.yaml --url=jdbc:postgresql://dlc-postgres:5432/di_lucca --username=billing_migrator --default-schema-name=billing --liquibase-schema-name=billing --contexts=dev update'
+    networks: [edge]
+
+  notifications-db-migrate:
+    image: liquibase/liquibase:4.33.0
+    depends_on:
+      billing-db-migrate: {condition: service_completed_successfully}
+    volumes:
+      - ../../worker/dlc-worker:/workspace:ro
+      - ${DLC_RUNTIME_DIR}/secrets/notifications-migrator.txt:/run/secrets/notifications_migrator_password:ro
+    environment: {DLC_ENVIRONMENT: dev, DLC_POSTGRES_HOST: dlc-postgres, DLC_POSTGRES_DB: di_lucca}
+    entrypoint: ["/bin/sh", "/workspace/db/deploy/run-migration.sh"]
+    command: ["update"]
+    networks: [edge]
+
+  iam-provision:
+    image: postgres:17.11-alpine3.24
+    depends_on:
+      notifications-db-migrate: {condition: service_completed_successfully}
+    environment:
+      PGHOST: dlc-postgres
+      PGDATABASE: di_lucca
+      PGUSER: postgres
+      PGPASSWORD_FILE: /run/bootstrap-secrets/pg.txt
+      DLC_SECRETS_DIR: /run/bootstrap-secrets
+      DLC_ADMIN_EMAIL: ${DLC_ADMIN_EMAIL:?Set DLC_ADMIN_EMAIL for the initial local administrator}
+    volumes:
+      - ./docker/provision-iam.sh:/provision.sh:ro
+      - ${DLC_RUNTIME_DIR}/secrets:/run/bootstrap-secrets:ro
+    entrypoint: ["sh", "/provision.sh"]
+    networks: [edge]
+
+networks:
+  edge: {}
+volumes:
+  pg_data: {}

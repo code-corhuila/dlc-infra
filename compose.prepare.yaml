@@ -1,0 +1,12 @@
+# Preparatory stage for a new local test installation.
+services:
+  prepare-runtime:
+    build:
+      context: .
+      dockerfile: docker/prepare-runtime.Dockerfile
+    image: dlc-infra-runtime-setup:local
+    environment:
+      DLC_RUNTIME_DIR: /runtime
+    volumes:
+      - ${DLC_RUNTIME_DIR:?Set DLC_RUNTIME_DIR to a private, empty directory}:/runtime
+      - ../../dlc-front/dlc-front/fixtures/portal-registry.json:/input/portal-registry.json:ro
