@@ -58,7 +58,7 @@ services:
     volumes:
       - ../../patients/dlc-patient-db:/workspace:ro
       - ${DLC_RUNTIME_DIR:-./.local}/secrets/patients-migrator.txt:/run/secrets/patients_migrator_password:ro
-    environment: {PG_HOST: dlc-postgres, PG_DATABASE: di_lucca, PG_ENVIRONMENT: dev}
+    environment: {PG_HOST: dlc-postgres, PG_DATABASE: di_lucca, PG_ENVIRONMENT: "${DLC_ENVIRONMENT:-dev}"}
     entrypoint: ["/bin/sh", "/workspace/deploy/run-migration.sh"]
     command: ["update"]
     networks: [edge]
@@ -70,7 +70,7 @@ services:
     volumes:
       - ../../appointments/dlc-appointments-db:/workspace:ro
       - ${DLC_RUNTIME_DIR:-./.local}/secrets/appointments-migrator.txt:/run/secrets/appointments_migrator_password:ro
-    environment: {DLC_ENVIRONMENT: dev, DLC_POSTGRES_HOST: dlc-postgres, DLC_POSTGRES_DB: di_lucca}
+    environment: {DLC_ENVIRONMENT: "${DLC_ENVIRONMENT:-dev}", DLC_POSTGRES_HOST: dlc-postgres, DLC_POSTGRES_DB: di_lucca}
     entrypoint: ["/bin/sh", "/workspace/deploy/run-migration.sh"]
     command: ["update"]
     networks: [edge]
@@ -84,7 +84,7 @@ services:
       - ${DLC_RUNTIME_DIR:-./.local}/secrets/billing-migrator.txt:/run/secrets/migrator:ro
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - 'export LIQUIBASE_COMMAND_PASSWORD=$$(cat /run/secrets/migrator); exec liquibase --search-path=/workspace --changelog-file=changelog/changelog-master.yaml --url=jdbc:postgresql://dlc-postgres:5432/di_lucca --username=billing_migrator --default-schema-name=billing --liquibase-schema-name=billing --contexts=dev update'
+      - 'export LIQUIBASE_COMMAND_PASSWORD=$$(cat /run/secrets/migrator); exec liquibase --search-path=/workspace --changelog-file=changelog/changelog-master.yaml --url=jdbc:postgresql://dlc-postgres:5432/di_lucca --username=billing_migrator --default-schema-name=billing --liquibase-schema-name=billing --contexts=${DLC_ENVIRONMENT:-dev} update'
     networks: [edge]
 
   notifications-db-migrate:
@@ -94,7 +94,7 @@ services:
     volumes:
       - ../../worker/dlc-worker:/workspace:ro
       - ${DLC_RUNTIME_DIR:-./.local}/secrets/notifications-migrator.txt:/run/secrets/notifications_migrator_password:ro
-    environment: {DLC_ENVIRONMENT: dev, DLC_POSTGRES_HOST: dlc-postgres, DLC_POSTGRES_DB: di_lucca}
+    environment: {DLC_ENVIRONMENT: "${DLC_ENVIRONMENT:-dev}", DLC_POSTGRES_HOST: dlc-postgres, DLC_POSTGRES_DB: di_lucca}
     entrypoint: ["/bin/sh", "/workspace/db/deploy/run-migration.sh"]
     command: ["update"]
     networks: [edge]
