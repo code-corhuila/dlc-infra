@@ -13,7 +13,8 @@ New-Item -ItemType Directory -Force $temp | Out-Null
 try {
     $registry = (Join-Path $workspace 'dlc-front/dlc-front/fixtures/portal-registry.json').Replace('\','/') + ':/input/portal-registry.json:ro'
     $runtime = $temp.Replace('\','/') + ':/runtime'
-    & docker run --rm -v $runtime -v $registry dlc-infra-runtime-setup:test
+    $billingMount = (Join-Path $workspace 'billing/dlc-billing-portal/package.json').Replace('\','/') + ':/input/billing-package.json:ro'
+    & docker run --rm -v $runtime -v $registry -v $billingMount dlc-infra-runtime-setup:local
     if ($LASTEXITCODE -ne 0) { throw 'Runtime generation failed' }
     $password = [IO.File]::ReadAllText((Join-Path $temp 'secrets/pg.txt'))
     & docker @compose up -d iam-provision
@@ -26,6 +27,8 @@ try {
     if ($LASTEXITCODE -ne 0 -or $admin.Trim() -ne '1') { throw 'Initial administrator was not created' }
     $clients = & docker @compose exec -T -e PGPASSWORD=$password dlc-postgres psql -U postgres -d di_lucca -v ON_ERROR_STOP=1 -tAc 'SELECT count(*) FROM iam.service_clients;'
     if ($LASTEXITCODE -ne 0 -or [int]$clients.Trim() -lt 5) { throw 'Service clients were not created' }
+    $table = & docker @compose exec -T -e PGPASSWORD=$password dlc-postgres psql -U postgres -d di_lucca -v ON_ERROR_STOP=1 -tAc "SELECT to_regclass('notifications.scheduled_deliveries') IS NOT NULL;"
+    if ($LASTEXITCODE -ne 0 -or $table.Trim() -ne 't') { throw 'Scheduled-notice migration is missing' }
     & docker @compose run --rm --no-deps iam-provision
     if ($LASTEXITCODE -ne 0) { throw 'IAM provisioning cannot be repeated safely' }
     Write-Output 'Database initialization pipeline completed.'

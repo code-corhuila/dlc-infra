@@ -44,7 +44,9 @@ services:
   appointments-api:
     depends_on: {iam-provision: {condition: service_completed_successfully}, auth-service: {condition: service_started}, rabbitmq: {condition: service_started}}
     entrypoint: ["/dlc-launcher", "/opt/java/openjdk/bin/java", "-jar", "/app/app.jar"]
-    environment: {DLC_LAUNCH_ENV: /run/secrets/apt/runtime.env}
+    environment:
+      DLC_LAUNCH_ENV: /run/secrets/apt/runtime.env
+      APPOINTMENTS_REMINDERS_ENABLED: ${DLC_APPOINTMENTS_REMINDERS_ENABLED:-true}
     volumes: ["${DLC_RUNTIME_DIR:-./.local}/launcher:/dlc-launcher:ro"]
   billing-api:
     depends_on: {iam-provision: {condition: service_completed_successfully}, auth-service: {condition: service_started}, rabbitmq: {condition: service_started}}
@@ -54,7 +56,14 @@ services:
   dlc-worker:
     depends_on: {iam-provision: {condition: service_completed_successfully}, auth-service: {condition: service_started}, rabbitmq: {condition: service_started}}
     entrypoint: ["/dlc-launcher", "/opt/java/openjdk/bin/java", "-jar", "/app/app.jar"]
-    environment: {DLC_LAUNCH_ENV: /run/secrets/worker/runtime.env}
+    environment:
+      DLC_LAUNCH_ENV: /run/secrets/worker/runtime.env
+      SMTP_HOST: ${DLC_WORKER_SMTP_HOST:-mailpit}
+      SMTP_PORT: ${DLC_WORKER_SMTP_PORT:-1025}
+      SMTP_STARTTLS: ${DLC_WORKER_SMTP_STARTTLS:-false}
+      SMTP_USERNAME: ${DLC_WORKER_SMTP_USERNAME:-}
+      SMTP_PASSWORD_FILE: /run/secrets/worker/smtp-password
+      SMTP_FROM: ${DLC_WORKER_SMTP_FROM:-facturacion@dilucca.test}
     volumes: ["${DLC_RUNTIME_DIR:-./.local}/launcher:/dlc-launcher:ro"]
   clinical-api:
     depends_on: {dlc-mongo-runtime-identity: {condition: service_completed_successfully}, iam-provision: {condition: service_completed_successfully}}
