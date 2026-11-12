@@ -1,0 +1,19 @@
+# qa runs the code of each repository's qa branch. Billing has not been promoted to
+# qa yet (its qa branch holds no code), so its API and migration are not started and
+# the PostgreSQL bootstrap skips the billing schema.
+services:
+  billing-api:
+    profiles: [billing-not-promoted]
+  billing-db-migrate:
+    profiles: [billing-not-promoted]
+  notifications-db-migrate:
+    depends_on: !override
+      appointments-db-migrate: {condition: service_completed_successfully}
+  postgres-bootstrap:
+    volumes: !override
+      - ./docker/bootstrap-postgres.sh:/bootstrap.sh:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/secrets:/run/bootstrap-secrets:ro
+      - ../../iam/dlc-iam-db/deploy/bootstrap.sql:/bootstrap-sql/iam.sql:ro
+      - ../../patients/dlc-patient-db/deploy/bootstrap.sql:/bootstrap-sql/patients.sql:ro
+      - ../../appointments/dlc-appointments-db/deploy/bootstrap.sql:/bootstrap-sql/appointments.sql:ro
+      - ../../worker/dlc-worker/db/deploy/bootstrap.sql:/bootstrap-sql/notifications.sql:ro

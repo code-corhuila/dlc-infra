@@ -17,10 +17,21 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 SQL
 
 for domain in iam patients appointments billing notifications; do
+  # A stage branch may not contain every domain yet (for example Billing before
+  # its promotion to qa); that domain's schema and roles are then not created.
+  if [ ! -f "$DLC_BOOTSTRAP_DIR/$domain.sql" ]; then
+    echo "Skipping $domain: no bootstrap.sql in this stage"
+    continue
+  fi
   psql -X -v ON_ERROR_STOP=1 -q -f "$DLC_BOOTSTRAP_DIR/$domain.sql"
 done
 
 while IFS='|' read -r role file; do
+  exists=$(psql -X -At -v role="$role" <<'SQL'
+SELECT count(*) FROM pg_roles WHERE rolname = :'role';
+SQL
+)
+  [ "$exists" = 1 ] || continue
   password=$(cat "$DLC_SECRETS_DIR/$file")
   # Passing the password through psql's literal quoting avoids SQL injection.
   psql -X -v ON_ERROR_STOP=1 -q -v role="$role" -v password="$password" <<'SQL'
