@@ -1,0 +1,7 @@
+# Database engines come back after Docker Desktop restarts or the host resumes,
+# like the services that depend on them (Clinical would otherwise loop without MongoDB).
+services:
+  dlc-postgres:
+    restart: unless-stopped
+  dlc-mongo:
+    restart: unless-stopped

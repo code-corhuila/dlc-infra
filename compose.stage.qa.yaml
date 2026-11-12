@@ -12,6 +12,7 @@ include:
       - compose.init.yaml
       - compose.fresh.override.yaml
       - compose.stage-tls.yaml
+      - compose.stage-restart.yaml
       - compose.stage-app.yaml
       - compose.stage-viewer.yaml
       - compose.stage-qa.yaml
