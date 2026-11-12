@@ -8,5 +8,6 @@ services:
     environment:
       DLC_RUNTIME_DIR: /runtime
     volumes:
-      - ${DLC_RUNTIME_DIR:?Set DLC_RUNTIME_DIR to a private, empty directory}:/runtime
+      - ${DLC_RUNTIME_DIR:-./.local}:/runtime
       - ../../dlc-front/dlc-front/fixtures/portal-registry.json:/input/portal-registry.json:ro
+      - ../../billing/dlc-billing-portal/package.json:/input/billing-package.json:ro
