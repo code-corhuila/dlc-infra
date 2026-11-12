@@ -9,4 +9,5 @@ include:
       - compose.mongo-init.yaml
       - compose.init.yaml
       - compose.stage-tls.yaml
+      - compose.stage-restart.yaml
       - compose.stage-viewer.yaml
