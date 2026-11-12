@@ -53,11 +53,16 @@ GRANTS
 password=$(cat "$DLC_SECRETS_DIR/staff-password.txt")
 psql -X -q -v ON_ERROR_STOP=1 -v email="$DLC_ADMIN_EMAIL" -v password="$password" <<'SQL'
 WITH created AS (
-INSERT INTO iam.users(user_id,email,password_hash,status,email_verified_at,created_at,updated_at)
-VALUES (gen_random_uuid(),:'email',crypt(:'password',gen_salt('bf',12)),'ACTIVE',now(),now(),now())
+INSERT INTO iam.users(user_id,email,password_hash,status,email_verified_at,created_at,updated_at,display_name)
+VALUES (gen_random_uuid(),:'email',crypt(:'password',gen_salt('bf',12)),'ACTIVE',now(),now(),now(),'Administrador local')
 ON CONFLICT(email) DO NOTHING RETURNING user_id
 )
 INSERT INTO iam.user_roles(user_id,role,assigned_at)
 SELECT user_id,'ADMINISTRATOR',now() FROM created ON CONFLICT DO NOTHING;
 SELECT 1 / (EXISTS (SELECT 1 FROM iam.users u JOIN iam.user_roles r USING (user_id) WHERE u.email=:'email' AND r.role='ADMINISTRATOR'))::int;
+-- Repair an administrator created by an older local initializer only when
+-- the generated credential matches; never change an unrelated account.
+UPDATE iam.users u SET display_name='Administrador local', updated_at=now()
+WHERE u.email=:'email' AND u.display_name IS NULL AND u.password_hash=crypt(:'password',u.password_hash)
+  AND EXISTS (SELECT 1 FROM iam.user_roles r WHERE r.user_id=u.user_id AND r.role='ADMINISTRATOR');
 SQL
