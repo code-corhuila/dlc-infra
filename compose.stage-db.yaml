@@ -1,0 +1,11 @@
+# Databases only (PostgreSQL + MongoDB) for one stage: develop, qa or main.
+# Each stage is its own Compose project with its own volumes, networks and generated
+# secrets under DLC_RUNTIME_DIR; no database port is published. Start it with
+# stage-db.ps1, which selects env/<stage>.env and the MongoDB TLS material.
+include:
+  - path:
+      - compose.prepare.yaml
+      - compose.database-init.yaml
+      - compose.mongo-init.yaml
+      - compose.init.yaml
+      - compose.stage-tls.yaml

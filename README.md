@@ -39,6 +39,34 @@ processes, portal entry points, administrator login and authenticated Patients,
 Appointments and Billing requests. This does not replace a complete clinical
 and payment end-to-end test. The existing restart workflow below is unchanged.
 
+## Stage databases: develop, qa and main
+
+Each stage has its own PostgreSQL and MongoDB, started as a separate Compose project
+(`dlc-db-develop`, `dlc-db-qa`, `dlc-db-main`) with its own volumes, networks and generated
+secrets under `.local/stages/<stage>` (ignored by Git). No database port is published.
+
+| Stage | Branch | `DLC_ENVIRONMENT` / Liquibase context | Synthetic seed |
+|---|---|---|---|
+| develop | `develop` | `dev` | yes |
+| qa | `qa` | `qa` | yes |
+| main | `main` | `prod` | never |
+
+Every domain repository runs its own migrations with that context, so changesets marked
+`dev or qa` are skipped in `main`. MongoDB requires TLS 1.2+ in the three stages
+(`compose.stage-tls.yaml`); `stage-db.ps1` creates a per-stage CA and server certificate.
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\stage-db.ps1 -Stage develop
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\stage-db.ps1 -Stage qa -Action status
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\stage-db.ps1 -Stage main -Action down
+```
+
+`down` removes only that stage's containers and volumes. The stage files are `env/<stage>.env`
+(no secrets) and `compose.stage-db.yaml`. These are local stage databases for validating
+migrations per branch; hosting of shared stages remains pending.
+
+## Existing local installation
+
 This repository starts the existing local DI LUCCA installation, including MongoDB, PostgreSQL, RabbitMQ, IAM, Patients, Appointments, Clinical, Billing, the gateway, portals and worker. It preserves the existing database volumes.
 
 From this directory in PowerShell 5.1 or later, run:
