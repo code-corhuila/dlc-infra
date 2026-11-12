@@ -1,0 +1,89 @@
+services:
+  dlc-postgres:
+    secrets: !reset []
+  iam-db-migrate:
+    profiles: !reset []
+    secrets: !reset []
+  patients-db-migrate:
+    profiles: !reset []
+    secrets: !reset []
+  appointments-db-migrate:
+    profiles: !reset []
+    secrets: !reset []
+  billing-db-migrate:
+    profiles: !reset []
+  notifications-db-migrate:
+    profiles: !reset []
+
+  rabbitmq:
+    depends_on: {prepare-runtime: {condition: service_completed_successfully}}
+    entrypoint: ["/dlc-launcher", "/usr/local/bin/docker-entrypoint.sh"]
+    command: ["rabbitmq-server"]
+    environment: {DLC_LAUNCH_ENV: /run/local/runtime.env}
+    volumes:
+      - ${DLC_RUNTIME_DIR:-./.local}/launcher:/dlc-launcher:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/secrets/rabbitmq:/run/local:ro
+  svc-jwks:
+    depends_on: {prepare-runtime: {condition: service_completed_successfully}}
+  auth-service:
+    env_file: !reset []
+    depends_on:
+      iam-provision: {condition: service_completed_successfully}
+      rabbitmq: {condition: service_started}
+      svc-jwks: {condition: service_started}
+    entrypoint: ["/dlc-launcher", "/opt/java/openjdk/bin/java", "-jar", "/app/iam.jar"]
+    environment:
+      DLC_LAUNCH_ENV: /run/local/runtime.env
+      IAM_TRUSTED_GATEWAY_IP: ${DLC_GATEWAY_IP:-172.31.0.241}
+      IAM_AUTH_ALLOWED_ORIGIN: ${DLC_PUBLIC_ORIGIN:-http://localhost:8081}
+    volumes:
+      - ${DLC_RUNTIME_DIR:-./.local}/launcher:/dlc-launcher:ro
+      - ${DLC_RUNTIME_DIR:-./.local}/secrets/iam-runtime:/run/local:ro
+  patients-api:
+    depends_on: {iam-provision: {condition: service_completed_successfully}, auth-service: {condition: service_started}}
+  appointments-api:
+    depends_on: {iam-provision: {condition: service_completed_successfully}, auth-service: {condition: service_started}, rabbitmq: {condition: service_started}}
+    entrypoint: ["/dlc-launcher", "/opt/java/openjdk/bin/java", "-jar", "/app/app.jar"]
+    environment: {DLC_LAUNCH_ENV: /run/secrets/apt/runtime.env}
+    volumes: ["${DLC_RUNTIME_DIR:-./.local}/launcher:/dlc-launcher:ro"]
+  billing-api:
+    depends_on: {iam-provision: {condition: service_completed_successfully}, auth-service: {condition: service_started}, rabbitmq: {condition: service_started}}
+    entrypoint: ["/dlc-launcher", "/opt/java/openjdk/bin/java", "-jar", "/app/billing.jar"]
+    environment: {DLC_LAUNCH_ENV: /run/secrets/billing/runtime.env}
+    volumes: ["${DLC_RUNTIME_DIR:-./.local}/launcher:/dlc-launcher:ro"]
+  dlc-worker:
+    depends_on: {iam-provision: {condition: service_completed_successfully}, auth-service: {condition: service_started}, rabbitmq: {condition: service_started}}
+    entrypoint: ["/dlc-launcher", "/opt/java/openjdk/bin/java", "-jar", "/app/app.jar"]
+    environment: {DLC_LAUNCH_ENV: /run/secrets/worker/runtime.env}
+    volumes: ["${DLC_RUNTIME_DIR:-./.local}/launcher:/dlc-launcher:ro"]
+  clinical-api:
+    depends_on: {dlc-mongo-runtime-identity: {condition: service_completed_successfully}, iam-provision: {condition: service_completed_successfully}}
+  clinical-outbox-relay: &clinical-launch
+    depends_on: {dlc-mongo-runtime-identity: {condition: service_completed_successfully}, iam-provision: {condition: service_completed_successfully}, rabbitmq: {condition: service_started}}
+    entrypoint: ["/dlc-launcher", "/clinical-outbox-relay"]
+    environment: {DLC_LAUNCH_ENV: /run/secrets/clinical/runtime.env}
+    volumes: ["${DLC_RUNTIME_DIR:-./.local}/launcher:/dlc-launcher:ro"]
+  clinical-inbox-consumer:
+    <<: *clinical-launch
+    entrypoint: ["/dlc-launcher", "/clinical-inbox-consumer"]
+  clinical-intent-reconciler:
+    <<: *clinical-launch
+    entrypoint: ["/dlc-launcher", "/clinical-intent-reconciler"]
+  clinical-analytics-consumer:
+    <<: *clinical-launch
+    entrypoint: ["/dlc-launcher", "/clinical-analytics-consumer"]
+  api-gateway:
+    environment: {GATEWAY_TRUSTED_PROXY: "${DLC_FRONT_IP:-172.31.0.240}/32", GATEWAY_ALLOWED_ORIGIN: "${DLC_PUBLIC_ORIGIN:-http://localhost:8081}"}
+    networks:
+      edge: {ipv4_address: "${DLC_GATEWAY_IP:-172.31.0.241}", aliases: [dlc-api-gateway]}
+  dlc-front:
+    depends_on: {prepare-runtime: {condition: service_completed_successfully}}
+    ports: !override ["${DLC_FRONT_PORT:-8081}:80"]
+    networks: {edge: {ipv4_address: "${DLC_FRONT_IP:-172.31.0.240}"}}
+  mailpit:
+    ports: !override ["${DLC_MAIL_PORT:-18025}:8025"]
+
+networks:
+  edge: !override
+    ipam: {config: [{subnet: "${DLC_EDGE_SUBNET:-172.31.0.0/24}"}]}
+  clinical-data: !override {}
