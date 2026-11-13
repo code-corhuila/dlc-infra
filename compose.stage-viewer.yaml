@@ -1,0 +1,13 @@
+# Read-only friendly web viewer for the stage PostgreSQL, bound to 127.0.0.1 only.
+# Log in with server dlc-postgres, database di_lucca and a role whose password is in
+# DLC_RUNTIME_DIR/secrets (for example the postgres admin in pg.txt).
+services:
+  db-viewer:
+    image: adminer:4.8.1
+    restart: unless-stopped
+    depends_on:
+      dlc-postgres: {condition: service_healthy}
+    environment:
+      ADMINER_DEFAULT_SERVER: dlc-postgres
+    ports: ["127.0.0.1:${DLC_DB_VIEWER_PORT:-18091}:8080"]
+    networks: [edge]

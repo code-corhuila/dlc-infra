@@ -48,7 +48,7 @@ services:
     depends_on:
       dlc-mongo-init: {condition: service_completed_successfully}
       dlc-mongo: {condition: service_healthy}
-    environment: {DLC_ENVIRONMENT: dev, MONGO_HOST: dlc-mongo, MONGO_PORT: "27017", MONGO_REPLICA_SET: rs0}
+    environment: {DLC_ENVIRONMENT: "${DLC_ENVIRONMENT:-dev}", MONGO_HOST: dlc-mongo, MONGO_PORT: "27017", MONGO_REPLICA_SET: rs0}
     volumes:
       - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/clinical-migrator-password.txt:/run/secrets/clinical_migrator_password:ro
     working_dir: /workspace
