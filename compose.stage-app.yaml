@@ -1,0 +1,26 @@
+# Clinical services reach the stage MongoDB over TLS with the stage CA.
+# Runtime security flags stay local (no internal HTTPS or PostgreSQL TLS);
+# the stage is selected by its code, database and Liquibase context.
+x-clinical-mongo: &clinical-mongo
+  MONGO_URI: mongodb://dlc-mongo:27017/?replicaSet=rs0&tls=true&tlsCAFile=/run/tls/ca.pem
+services:
+  clinical-api:
+    environment: *clinical-mongo
+    volumes:
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/tls/ca.pem:/run/tls/ca.pem:ro
+  clinical-outbox-relay:
+    environment: *clinical-mongo
+    volumes:
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/tls/ca.pem:/run/tls/ca.pem:ro
+  clinical-inbox-consumer:
+    environment: *clinical-mongo
+    volumes:
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/tls/ca.pem:/run/tls/ca.pem:ro
+  clinical-intent-reconciler:
+    environment: *clinical-mongo
+    volumes:
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/tls/ca.pem:/run/tls/ca.pem:ro
+  clinical-analytics-consumer:
+    environment: *clinical-mongo
+    volumes:
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/tls/ca.pem:/run/tls/ca.pem:ro

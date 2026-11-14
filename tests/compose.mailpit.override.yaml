@@ -1,0 +1,9 @@
+services:
+  dlc-worker:
+    environment:
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_STARTTLS: "false"
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD_FILE: ""
+      SMTP_FROM: facturacion@dilucca.test

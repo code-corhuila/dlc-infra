@@ -1,0 +1,39 @@
+# MongoDB TLS 1.2+ for the develop, qa and main stages (dlc-infra-mongo compose.tls.yml).
+# The CA and the server certificate (SAN dlc-mongo) are generated per stage by
+# stage-db.ps1 under DLC_RUNTIME_DIR/mongo-secrets/tls and are never committed.
+services:
+  dlc-mongo:
+    volumes:
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/tls:/run/tls:ro
+    command:
+      - mongod
+      - --replSet
+      - rs0
+      - --bind_ip_all
+      - --keyFile
+      - /data/configdb/keyfile
+      - --tlsMode
+      - requireTLS
+      - --tlsCertificateKeyFile
+      - /run/tls/server.pem
+      - --tlsCAFile
+      - /run/tls/ca.pem
+      - --tlsDisabledProtocols
+      - TLS1_0,TLS1_1
+      - --tlsAllowConnectionsWithoutCertificates
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--norc", "--tls", "--tlsCAFile", "/run/tls/ca.pem", "--host", "dlc-mongo", "--eval", "quit(db.hello().isWritablePrimary ? 0 : 1)"]
+
+  dlc-mongo-init:
+    volumes:
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/tls/ca.pem:/run/tls/ca.pem:ro
+    entrypoint: ["mongosh", "--quiet", "--norc", "mongodb://dlc-mongo:27017/?directConnection=true&tls=true&tlsCAFile=/run/tls/ca.pem", "/scripts/init.js"]
+
+  clinical-db-migrate:
+    volumes:
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/tls/ca.pem:/run/secrets/mongo_tls_ca:ro
+
+  dlc-mongo-runtime-identity:
+    volumes:
+      - ${DLC_RUNTIME_DIR:-./.local}/mongo-secrets/tls/ca.pem:/run/tls/ca.pem:ro
+    entrypoint: ["mongosh", "--quiet", "--norc", "mongodb://dlc-mongo:27017/?replicaSet=rs0&tls=true&tlsCAFile=/run/tls/ca.pem", "/scripts/runtime-identity.js"]

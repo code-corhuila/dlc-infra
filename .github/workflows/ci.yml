@@ -1,0 +1,40 @@
+name: CI
+on:
+  pull_request:
+    branches: [develop, qa, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  infra-structure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check repository baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s README.md
+          test -s .github/CODEOWNERS
+      - name: Reject committed secrets files
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=$(git ls-files | grep -E '(^|/)\.env$|(^|/)\.env\.[^/]+$|\.(pem|key|p12|pfx)$' | grep -vE '\.env\.example$' || true)
+          if [ -n "$found" ]; then
+            echo "Secret-like files must not be committed:"
+            echo "$found"
+            exit 1
+          fi
+      - name: Validate Compose files
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime_dir=$(mktemp -d)
+          trap 'rm -rf "$runtime_dir"' EXIT
+          mkdir -p "$runtime_dir/secrets"
+          touch "$runtime_dir/secrets/iam.env"
+          export DLC_RUNTIME_DIR="$runtime_dir"
+          export RMQ_PASS= APT_DB_PASSWORD= BILLING_DB_PASSWORD= NOTIFICATIONS_DB_PASSWORD=
+          docker compose -f compose.yaml -f compose.override.yaml config --quiet
